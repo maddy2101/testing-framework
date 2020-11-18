@@ -866,7 +866,7 @@ abstract class FunctionalTestCase extends BaseTestCase
         $locationHeaders = [];
 
         do {
-            $result = $this->newRetrieveFrontendRequestResult($request, $context);
+            $result = $this->retrieveFrontendSubRequestResult($request, $context);
             $response = $this->reconstituteFrontendRequestResult($result);
             $locationHeader = $response->getHeaderLine('location');
             if (in_array($locationHeader, $locationHeaders, true)) {
