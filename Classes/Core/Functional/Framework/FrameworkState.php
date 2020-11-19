@@ -15,6 +15,7 @@ namespace TYPO3\TestingFramework\Core\Functional\Framework;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Database\ReferenceIndex;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\RootlineUtility;
 
@@ -32,6 +33,15 @@ class FrameworkState
         $state['globals-beUser'] = $GLOBALS['BE_USER'] ?: null;
         // InternalRequestContext->withGlobalSettings() may override globals, especially TYPO3_CONF_VARS
         $state['globals-typo3-conf-vars'] = $GLOBALS['TYPO3_CONF_VARS'] ?: null;
+
+        // Backing up TCA *should* not be needed: TCA is (hopefully) never changed after bootstrap and
+        // identical in FE and BE. We had 2 issues here: a) Some test extensions still changed TCA in ext_tables.php,
+        // which means that FE will calculate different TCA since FE does not load ext_tables.php. Moving to TCA/Overrides
+        // helped. b) Some tests change TCA on the fly (eg. core DataHandling/Regular/Modify localizeContentWithEmptyTcaIntegrityColumns).
+        // A FE call then resets this TCA change since it initializes this global again. Then, after the FE call the TCA is
+        // different. And code that runs after it within the test scope may fail (eg. the referenceIndex check in tearDown() that
+        // relies on TCA.
+        $state['globals-tca'] = $GLOBALS['TCA'];
 
         $generalUtilityReflection = new \ReflectionClass(GeneralUtility::class);
         $generalUtilityIndpEnvCache = $generalUtilityReflection->getProperty('indpEnvCache');
@@ -72,6 +82,15 @@ class FrameworkState
         $rootlineUtilityRootlineFields = $rootlineUtilityReflection->getProperty('rootlineFields');
         $rootlineUtilityRootlineFields->setAccessible(true);
         $state['rootlineUtilityRootlineFields'] = $rootlineFieldsDefault;
+
+        // Unsure about this one.
+        // $referenceIndexReflection = new \ReflectionClass(ReferenceIndex::class);
+        // $referenceIndexExcludeTables = $referenceIndexReflection->getProperty('excludedTables');
+        // $referenceIndexExcludeTables->setAccessible(true);
+        // $referenceIndexExcludeTables->setValue([
+        //     'sys_log' => true,
+        //     'tx_extensionmanager_domain_model_extension' => true
+        // ]);
     }
 
     public static function pop()
@@ -85,6 +104,8 @@ class FrameworkState
         if ($state['globals-typo3-conf-vars'] !== null) {
             $GLOBALS['TYPO3_CONF_VARS'] = $state['globals-typo3-conf-vars'];
         }
+
+        $GLOBALS['TCA'] = $state['globals-tca'];
 
         $generalUtilityReflection = new \ReflectionClass(GeneralUtility::class);
         $generalUtilityIndpEnvCache = $generalUtilityReflection->getProperty('indpEnvCache');
